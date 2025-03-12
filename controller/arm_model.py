@@ -8,7 +8,7 @@ class ArmModel():
         # [d, a, alpha, theta]
         dh_params = np.array([[0.160, 0., 0.5 * pi, 0.],
                           [0., 0.110, 0., 0.],
-                          [0., 0.245, 0., 0.]])
+                          [0., 0.110, 0., 0.]])
 
         self.model = RobotSerial(dh_params)
 
