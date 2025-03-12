@@ -1,0 +1,18 @@
+{
+	"extension": {
+		"version": "0.6.1",
+		"json": 2
+	},
+	"project": {
+		"name": "VEX-arm",
+		"description": "",
+		"creationDate": "12/3/2025, 4:30:21 PM",
+		"platform": "EXP",
+		"language": "python",
+		"slot": 1,
+		"sdkVersion": "EXP_1_0_0_21",
+		"python": {
+			"main": "vex/src/main.py"
+		}
+	}
+}

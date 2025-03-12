@@ -1,5 +1,4 @@
 import numpy as np
-from math import pi
 from visual_kinematics.RobotSerial import *
 
 class ArmModel():
