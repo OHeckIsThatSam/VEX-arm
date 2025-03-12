@@ -5,6 +5,7 @@ from visual_kinematics.RobotSerial import *
 class ArmModel():
     def __init__(self):
         # Using Denavit-Hartenberg (DH) notation for representation of arm properties
+        # DH modelling file found in /DH/ArmDH.kinbin, used by "Robotic Arm Kinematic GUI - Part of MRPT"
         # [d, a, alpha, theta]
         dh_params = np.array([[0.160, 0., 0.5 * pi, 0.],
                           [0., 0.110, 0., 0.],
