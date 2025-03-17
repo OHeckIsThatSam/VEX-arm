@@ -12,17 +12,13 @@
 from vex import *
 
 brain = Brain()
-motor1 = Motor(Ports.PORT1, False)
-motor2 = Motor(Ports.PORT2, False)
-motor3 = Motor(Ports.PORT3, False)
+base = Motor(Ports.PORT1, False)
+elbow = Motor(Ports.PORT2, False)
+wrist = Motor(Ports.PORT3, False)
 
-motors = [motor1, motor2, motor3]
-
-def validate():
-    pass
-
-def parse_serial_message():
-    pass
+arm = MotorGroup(base, elbow, wrist)
+arm.set_stopping(HOLD)
+arm.set_velocity(10, PERCENT)
 
 def handle_exception(ex):
     brain.screen.clear_screen()
@@ -31,42 +27,39 @@ def handle_exception(ex):
     print(ex)
 
 def move(data):
-    motor1.spin_to_position(int(data[0]), DEGREES)
-    motor2.spin_to_position(data[1], DEGREES)
-    motor3.spin_to_position(data[2], DEGREES)
+    elbow.spin_to_position(data[1], DEGREES, wait=True)
+    wrist.spin_to_position(data[2], DEGREES, wait=True)
+    base.spin_to_position(data[0], DEGREES, wait=True)
 
 def print_message_to_screen(message):
     brain.screen.clear_screen()
-    i = 1
-    for value in message:
-        brain.screen.set_cursor(i, 1)
-        brain.screen.print(value)
-        i = i + 1
+
+    for i in range(len(message)):
+        # Screen's cursor has 1 based index
+        brain.screen.set_cursor(i + 1, 1)
+        brain.screen.print(message[i])
 
 def serial_monitor():
     try:
-      s = open('/dev/serial1','rb')
+      serial = open('/dev/serial1','rb')
     except:
       raise Exception('serial port not available')
   
     while True:
-        data=s.readline()
+        data = serial.readline()
+        
         if data == None:
             continue
 
-        message = data.split()
-        messageints = []
-
-        for m in message:
-            messageints.append(float(m))
+        joint_angles = []
+        for angle in data.split():
+            joint_angles.append(float(angle))
+            
         brain.screen.set_cursor(1, 1)
-        brain.screen.print(messageints)
-        move(messageints)
+        brain.screen.print(joint_angles)
+        move(joint_angles)
 
 try:
-    for motor in motors:
-        motor.set_stopping(HOLD)
-        motor.set_velocity(10, PERCENT)
     t1=Thread(serial_monitor)
 except Exception as ex:
     handle_exception(ex)
