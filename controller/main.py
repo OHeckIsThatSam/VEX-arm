@@ -1,31 +1,31 @@
 from arm_model import ArmModel
-import serial_communication as ser
+import serial_communication as serial
 import numpy as np
+import config
 
-
-DECIMAL_PLACES = 1
 
 def main():
-    model = ArmModel()
+    model = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
 
-    x = -0.22
-    y = -0.70
-    z = 0.35
-
-    while(True):
-        print("Enter X: ")
-        x = float(input())
-        print("Enter y: ")
-        y = float(input())
-        print("Enter z: ")
-        z = float(input())
+    while True:
+        x = 0
+        y = 0
+        z = 0 + config.Z_AXIS_TOLERANCE
+        is_pickup = False
+        try:
+            x = float(input("Enter X: "))
+            y = float(input("Enter y: "))
+            z = float(input("Enter z: ")) + config.Z_AXIS_TOLERANCE
+            is_pickup = bool(input("Is pickup? (t/or blank): "))
+        except (TypeError, ValueError):
+            print("Invalid input: Could not be parsed.")
+            continue
 
         results = model.calc_joint_degrees(x, y, z)
 
-        base_angle = round(results[1], DECIMAL_PLACES)
-        # Construction of the arm means the elbow motor turns anti clockwise compared to the model
-        elbow_angle = -round(results[2], DECIMAL_PLACES)
-        wrist_angle = round(results[3], DECIMAL_PLACES)
+        base_angle = round(results[1], config.DECIMAL_PLACES)
+        shoulder_angle = round(results[2], config.DECIMAL_PLACES)
+        elbow_angle = round(results[3], config.DECIMAL_PLACES)
 
         # If the position entered cannot be reached by the arm then continue
         if (results[0] == False):
@@ -34,11 +34,13 @@ def main():
         print(np.array2string(results))
         model.show()
 
+        print(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
+
         # Hold for user input
         input()
 
-        ser.send_data(f"{base_angle} {elbow_angle} {wrist_angle}")
-    
+        serial.send_data(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
+
 
 if __name__ == "__main__":
     main()

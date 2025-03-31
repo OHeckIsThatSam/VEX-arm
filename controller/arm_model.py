@@ -2,15 +2,23 @@ import numpy as np
 from visual_kinematics.RobotSerial import *
 
 class ArmModel():
-    def __init__(self):
+    def __init__(self, x_limit, y_limit, z_limit):
         # Using Denavit-Hartenberg (DH) notation for representation of arm properties
         # DH modelling file found in /DH/ArmDH.kinbin, used by "Robotic Arm Kinematic GUI - Part of MRPT"
-        # [d, a, alpha, theta]
-        dh_params = np.array([[0.160, 0., 0.5 * pi, 0.],
-                          [0., 0.110, 0., 0.],
-                          [0., 0.110, 0., 0.]])
+        #                      [d, a, alpha, theta]
+        dh_params = np.array([[17.5, 0., 90.0 * pi / 180, 0.],
+                          [0., 15, 0., 3 * pi / 180],
+                          [0., 11.2, 0., -90.0 * pi / 180]])
 
-        self.model = RobotSerial(dh_params)
+        # Electro magnet tool DH
+        # [0., 7.3, 0., 0.]
+
+        self.model = RobotSerial(
+            dh_params=dh_params,
+            plot_xlim=x_limit,
+            plot_ylim=y_limit,
+            plot_zlim=z_limit,
+            max_iter=1000)
 
 
     def calc_joint_degrees(self, x, y, z):
@@ -42,7 +50,7 @@ class ArmModel():
 
 
     def rad_to_deg(_self, rad):
-        return rad * 180 / pi
+        return (rad * 180) / pi
     
     
     # Visual representation temporary for debug
