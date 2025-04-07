@@ -1,5 +1,8 @@
 {
 	"python.analysis.stubPath": "c:\\Users\\sam\\AppData\\Roaming\\Code\\User\\globalStorage\\vexrobotics.vexcode\\sdk\\python\\EXP\\EXP_1_0_0_21\\vexexp\\stubs",
 	"python.analysis.diagnosticMode": "workspace",
-	"python.analysis.typeCheckingMode": "basic"
+	"python.analysis.typeCheckingMode": "basic",
+	"python.analysis.extraPaths": [
+		"./vision"
+	]
 }

@@ -1,3 +1,8 @@
+# -------------------------------------------------------------
+# Adapted from: https://gitlab.com/duder1966/youtube-projects
+# Original Project: camruler (OpenCV-based measurement tool)
+# Author: duder1966
+# -------------------------------------------------------------
 
 import os,sys,time,traceback
 from math import hypot
@@ -6,6 +11,20 @@ import cv2
 
 import frame_capture
 import frame_draw
+
+import csv
+from datetime import datetime
+
+# --- Object logging ---
+object_log = []
+log_interval = 5  # seconds
+last_log_time = time.time()
+log_file = "object_log.csv"
+iteration = 0
+
+# Delete contents of log_file
+if os.path.exists(log_file):
+    open(log_file, 'w').close()
 
 # Config fallbacks
 camera_id = 0
@@ -472,7 +491,9 @@ while 1:
         
         # small crosshairs (after getting frame1)
         draw.crosshairs(frame0,5,weight=2,color='green')    
-    
+
+        object_log.clear()
+
         # loop over the contours
         for c in contours:
 
@@ -492,7 +513,6 @@ while 1:
 
             # display coordinate label
             draw.add_text(frame0, f'({x3c:.1f}cm, {y3c:.1f}cm)', x3, y3 - 12, center=True, color='blue')
-
 
             # percent area
             percent = 100*w*h/area
@@ -514,6 +534,16 @@ while 1:
             if max(xlen,ylen) > 0 and min(xlen,ylen)/max(xlen,ylen) >= 0.95:
                 alen = (xlen+ylen)/2              
             carea = xlen*ylen
+
+            # log object data
+            object_log.append({
+                "iteration": iteration,
+                "mid_x": round(x3c, 2),
+                "mid_y": round(y3c, 2),
+                "width": round(xlen, 2),
+                "height": round(ylen, 2),
+                "area": round(carea, 2)
+            })
 
             # plot
             draw.rect(frame0,x1,y1,x2,y2,weight=2,color='red')
@@ -594,6 +624,21 @@ while 1:
             else:
                 draw.add_text(frame0,f'{ylen:.2f}',x1-4,(y1+y2)/2,middle=True,right=True,color='red')
                 draw.add_text(frame0,f'{llen:.2f}',x2+8,y2-4,color='green')
+    
+    # check if it's time to write the log
+    if time.time() - last_log_time > log_interval and object_log:
+        write_header = not os.path.exists(log_file)
+
+        with open(log_file, 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=["iteration", "mid_x", "mid_y", "width", "height", "area"])
+            if write_header:
+                writer.writeheader()
+            writer.writerows(object_log)
+
+        print(f"[LOG] Wrote {len(object_log)} objects to {log_file}")
+        object_log.clear()
+        last_log_time = time.time()
+        iteration += 1
 
     # add usage key
     text.append('')

@@ -1,3 +1,9 @@
+# -------------------------------------------------------------
+# Adapted from: https://gitlab.com/duder1966/youtube-projects
+# Original Project: camruler (OpenCV-based measurement tool)
+# Author: duder1966
+# -------------------------------------------------------------
+
 import time
 import threading,queue
 import numpy as np
