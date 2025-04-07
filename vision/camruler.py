@@ -242,249 +242,122 @@ def key_event(key):
         if key_flags['rotate']:
             key_flags['rotate'] = False
         else:
-            key_flags['rotate'] = True
+            while start * scale > low:
+                start -= self.pixel_base
 
-    # auto mode
-    elif key == 97:
-        if key_flags['auto']:
-            key_flags['auto'] = False
+        stop = target
+        if unit_distance >= self.maths.baseround(self.cal_range, self.pixel_base):
+            high = max(self.values.keys())
         else:
-            key_flags_clear()
-            key_flags['auto'] = True
-            mouse_mark = None
+            while stop * scale < high:
+                stop += self.pixel_base
 
-    # auto percent
-    elif key == 112 and key_flags['auto']:
-        key_flags['percent'] = not key_flags['percent']
-        key_flags['thresh'] = False
-        key_flags['lock'] = False
+        for px in range(int(start), int(stop) + 1, self.pixel_base):
+            self.values[px] = scale
+            print(f'CAL: {px} {scale}')
 
-    # auto threshold
-    elif key == 116 and key_flags['auto']:
-        key_flags['thresh'] = not key_flags['thresh']
-        key_flags['percent'] = False
-        key_flags['lock'] = False
+class App:
+    def __init__(self):
+        self.config = Config()
+        self.maths = Maths()
+        self.calibration = None
+        self.key_flags = {
+            'config': False,
+            'cal_range_config': False,
+            'auto': False,
+            'thresh': False,
+            'percent': False,
+            'norms': False,
+            'rotate': False,
+            'lock': False
+        }
+        self.mouse_raw = (0, 0)
+        self.mouse_now = (0, 0)
+        self.mouse_mark = None
+        self.cal_last = None
+        self.detected_objects = []
 
-    # log
-    print('key:',[key,chr(key)])
-    key_last = key
-    
-#-------------------------------
-# mouse events
-#-------------------------------
+    def key_event(self, key):
+        if key == ord('c'):
+            self.key_flags['config'] = not self.key_flags['config']
+            self.cal_last, self.mouse_mark = (0, None) if self.key_flags['config'] else (None, self.mouse_mark)
+        elif key == ord('n'):
+            self.key_flags_clear()
+            self.key_flags['norms'] = True
+        elif key == ord('r'):
+            self.key_flags['rotate'] = not self.key_flags['rotate']
+        elif key == ord('a'):
+            self.key_flags_clear()
+            self.key_flags['auto'] = True
+        elif key == ord('p') and self.key_flags['auto']:
+            self.key_flags['percent'] = not self.key_flags['percent']
+        elif key == ord('t') and self.key_flags['auto']:
+            self.key_flags['thresh'] = not self.key_flags['thresh']
 
-# mouse events
-mouse_raw  = (0,0) # pixels from top left
-mouse_now  = (0,0) # pixels from center
-mouse_mark = None
+    def key_flags_clear(self):
+        for key in self.key_flags:
+            if key != 'rotate':
+                self.key_flags[key] = False
 
-# mouse callback
-def mouse_event(event,x,y,flags,parameters):
-    # globals
-    global mouse_raw
-    global mouse_now
-    global mouse_mark
-    global key_last
-    global auto_percent
-    global auto_threshold
-    global auto_blur
-    global norm_alpha
-    global norm_beta
+    def setup(self):
+        self.camera = frame_capture.Camera_Thread()
+        self.camera.camera_source = self.config['camera_id'] # type: ignore
+        self.camera.camera_width = self.config['camera_width'] # type: ignore
+        self.camera.camera_height = self.config['camera_height'] # type: ignore
+        self.camera.camera_frame_rate = self.config['camera_frame_rate'] # type: ignore
+        self.camera.camera_fourcc = self.config['camera_fourcc']
+        self.camera.start()
 
-    # update percent
-    if key_flags['percent']:
-        auto_percent = 5*(x/width)*(y/height)
+        self.width = self.camera.camera_width
+        self.height = self.camera.camera_height
+        self.cx = int(self.width / 2)
+        self.cy = int(self.height / 2)
+        self.dm = hypot(self.cx, self.cy)
 
-    # update threshold
-    elif key_flags['thresh']:
-        auto_threshold = int(255*x/width)
-        auto_blur = int(20*y/height) | 1 # insure it is odd and at least 1
+        self.calibration = Calibration(
+            self.maths,
+            self.dm,
+            self.config['pixel_base'],
+            self.config['cal_base'],
+            self.config['cal_range']
+        )
+        self.maths.calibration = self.calibration
+        self.draw = frame_draw.DRAW()
+        self.draw.width = self.width
+        self.draw.height = self.height
 
-    # update normalization
-    elif key_flags['norms']:
-        norm_alpha = int(64*x/width)
-        norm_beta  = min(255,int(128+(128*y/height)))
+    def process_frame(self, frame):
+        # Normalize
+        cv2.normalize(frame, frame, self.config["norm_alpha"], self.config["norm_beta"], cv2.NORM_MINMAX)
+        if self.key_flags['rotate']:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
-    # update mouse location
-    mouse_raw = (x,y)
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blur_size = max(1, int(self.config["auto_blur"]) | 1)
+        frame_blur = cv2.GaussianBlur(frame_gray, (blur_size, blur_size), 0)
+        thresh = cv2.threshold(frame_blur, self.config["auto_threshold"], 255, cv2.THRESH_BINARY)[1]
+        thresh = ~thresh  # Invert
 
-    # offset from center
-    # invert y to standard quadrants
-    ox = x - cx
-    oy = (y-cy)*-1
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # update mouse location
-    mouse_raw = (x,y)
-    if not key_flags['lock']:
-        mouse_now = (ox,oy)
+        objects = []
+        for c in contours:
+            x, y, w, h = cv2.boundingRect(c)
+            area = w * h
+            percent = 100 * area / (self.width * self.height)
 
-    # left click event
-    if event == 1:
+            if percent < self.config.get("auto_percent") or percent > 60:
+                continue
 
-        if key_flags['config']:
-            key_flags['lock'] = False
-            mouse_mark = (ox,oy)
+            cx_pixel = x + w / 2
+            cy_pixel = y + h / 2
 
-        elif key_flags['auto']:
-            key_flags['lock'] = False
-            mouse_mark = (ox,oy)
+            # Convert to center-origin
+            x_centered = cx_pixel - self.cx
+            y_centered = (cy_pixel - self.cy) * -1
+            x_real, y_real = self.maths.conv(x_centered, y_centered)
 
-        if key_flags['percent']:
-            key_flags['percent'] = False
-            mouse_mark = (ox,oy)
-            
-        elif key_flags['thresh']:
-            key_flags['thresh'] = False
-            mouse_mark = (ox,oy)
-            
-        elif key_flags['norms']:
-            key_flags['norms'] = False
-            mouse_mark = (ox,oy)
-
-        elif not key_flags['lock']:
-            if mouse_mark:
-                key_flags['lock'] = True
-            else:
-                mouse_mark = (ox,oy)
-        else:
-            key_flags['lock'] = False
-            mouse_now = (ox,oy)
-            mouse_mark = (ox,oy)
-
-        key_last = 0
-
-    # right click event
-    elif event == 2:
-        key_flags_clear()
-        mouse_mark = None
-        key_last = 0
-
-# register mouse callback
-cv2.setMouseCallback(framename,mouse_event)
-
-#-------------------------------
-# main loop
-#-------------------------------
-
-while 1:
-    frame0 = camera.next(wait=1)
-    if frame0 is None:
-        time.sleep(0.1)
-        continue
-
-    # normalize
-    cv2.normalize(frame0,frame0,norm_alpha,norm_beta,cv2.NORM_MINMAX)
-
-    # rotate 180
-    if key_flags['rotate']:
-        frame0 = cv2.rotate(frame0,cv2.ROTATE_90_CLOCKWISE)
-
-    text = []
-
-    # camera text
-    fps = camera.current_frame_rate
-    text.append(f'CAMERA: {camera_id} {width}x{height} {fps}FPS')
-
-    # mouse text
-    text.append('')
-    if not mouse_mark:
-        text.append(f'LAST CLICK: NONE')
-    else:
-        text.append(f'LAST CLICK: {mouse_mark} PIXELS')
-    text.append(f'CURRENT XY: {mouse_now} PIXELS')
-
-    #-------------------------------
-    # normalize mode
-    #-------------------------------
-    if key_flags['norms']:
-
-        # print
-        text.append('')
-        text.append(f'NORMILIZE MODE')
-        text.append(f'ALPHA (min): {norm_alpha}')
-        text.append(f'BETA (max): {norm_beta}')
-        
-    #-------------------------------
-    # config mode
-    #-------------------------------
-    if key_flags['config']:
-
-        # quadrant crosshairs
-        draw.crosshairs(frame0,5,weight=2,color='red',invert=True)
-
-        # crosshairs aligned (rotated) to maximum distance 
-        draw.line(frame0,cx,cy, cx+cx, cy+cy,weight=1,color='red')
-        draw.line(frame0,cx,cy, cx+cy, cy-cx,weight=1,color='red')
-        draw.line(frame0,cx,cy,-cx+cx,-cy+cy,weight=1,color='red')
-        draw.line(frame0,cx,cy, cx-cy, cy+cx,weight=1,color='red')
-
-        # mouse cursor lines (parallel to aligned crosshairs)
-        mx,my = mouse_raw
-        draw.line(frame0,mx,my,mx+dm,my+(dm*( cy/cx)),weight=1,color='green')
-        draw.line(frame0,mx,my,mx-dm,my-(dm*( cy/cx)),weight=1,color='green')
-        draw.line(frame0,mx,my,mx+dm,my+(dm*(-cx/cy)),weight=1,color='green')
-        draw.line(frame0,mx,my,mx-dm,my-(dm*(-cx/cy)),weight=1,color='green')
-    
-        # config text data
-        text.append('')
-        text.append(f'CONFIG MODE')
-
-        # start cal
-        if not cal_last:
-            cal_last = cal_base
-            caltext = f'CONFIG: Click on D = {cal_last}'
-
-        # continue cal
-        elif cal_last <= cal_range:
-            if mouse_mark:
-                cal_update(*mouse_mark,cal_last)
-                cal_last += cal_base
-            caltext = f'CONFIG: Click on D = {cal_last}'
-
-        # done
-        else:
-            key_flags_clear()
-            cal_last == None
-            with open(calfile,'w') as f:
-                data = list(cal.items())
-                data.sort()
-                for key,value in data:
-                    f.write(f'd,{key},{value}\n')
-                f.close()
-            caltext = f'CONFIG: Complete.'
-
-        # add caltext
-        draw.add_text(frame0,caltext,(cx)+100,(cy)+30,color='red')
-
-        # clear mouse
-        mouse_mark = None     
-
-    #-------------------------------
-    # auto mode
-    #-------------------------------
-    elif key_flags['auto']:
-        
-        mouse_mark = None
-
-        # auto text data
-        text.append('')
-        text.append(f'AUTO MODE')
-        text.append(f'UNITS: {unit_suffix}')
-        text.append(f'MIN PERCENT: {auto_percent:.2f}')
-        text.append(f'THRESHOLD: {auto_threshold}')
-        text.append(f'GAUSS BLUR: {auto_blur}')
-        
-        # gray frame
-        frame1 = cv2.cvtColor(frame0,cv2.COLOR_BGR2GRAY)
-
-        # blur frame
-        frame1 = cv2.GaussianBlur(frame1,(auto_blur,auto_blur),0)
-
-        # threshold frame n out of 255 (85 = 33%)
-        frame1 = cv2.threshold(frame1,auto_threshold,255,cv2.THRESH_BINARY)[1]
-
-        # invert
-        frame1 = ~frame1
+            objects.append((x_real, y_real))
 
         # find contours on thresholded image
         contours,nada = cv2.findContours(frame1,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
@@ -497,22 +370,24 @@ while 1:
         # loop over the contours
         for c in contours:
 
-            # contour data (from top left)
-            x1,y1,w,h = cv2.boundingRect(c)
-            x2,y2 = x1+w,y1+h
-            x3,y3 = x1+(w/2),y1+(h/2)
+        frame = self.camera.next(wait=1)
+        if frame is None:
+            return []
 
-            # convert to center-origin coordinates
-            x3r = x3 - cx
-            y3r = (y3 - cy) * -1
+        return self.process_frame(frame)
 
-            # convert to real-world units (mm → cm)
-            x3c, y3c = conv(x3r, y3r)
-            x3c /= 1
-            y3c /= 1
+    def run(self):
+        print("[App] Starting...")
+        self.setup()
+        
+        while 1:
+            frame0 = self.camera.next(wait=1)
+            if frame0 is None:
+                time.sleep(0.1)
+                continue
 
-            # display coordinate label
-            draw.add_text(frame0, f'({x3c:.1f}cm, {y3c:.1f}cm)', x3, y3 - 12, center=True, color='blue')
+            # normalize
+            cv2.normalize(frame0,frame0,self.config["norm_alpha"],self.config["norm_beta"],cv2.NORM_MINMAX)
 
             # percent area
             percent = 100*w*h/area
@@ -521,9 +396,9 @@ while 1:
             if percent < auto_percent:
                     continue
 
-            # if the contour is too large, ignore it
-            elif percent > 60:
-                    continue
+            # camera text
+            fps = self.camera.current_frame_rate
+            text.append(f'CAMERA: {self.config["camera_id"]} {self.width}x{self.height} {fps}FPS')
 
             # convert to center, then distance
             x1c,y1c = conv(x1-(cx),y1-(cy))
@@ -590,37 +465,8 @@ while 1:
 
             # print distances
             text.append('')
-            text.append(f'X LEN: {xlen:.2f}{unit_suffix}')
-            text.append(f'Y LEN: {ylen:.2f}{unit_suffix}')
-            text.append(f'L LEN: {llen:.2f}{unit_suffix}')
-
-            # convert to plot locations
-            x1 += cx
-            x2 += cx
-            y1 *= -1
-            y2 *= -1
-            y1 += cy
-            y2 += cy
-            x3 = x1+((x2-x1)/2)
-            y3 = max(y1,y2)
-
-            # line weight
-            weight = 1
-            if key_flags['lock']:
-                weight = 2
-
-            # plot
-            draw.rect(frame0,x1,y1,x2,y2,weight=weight,color='red')
-            draw.line(frame0,x1,y1,x2,y2,weight=weight,color='green')
-
-            # add dimensions
-            draw.add_text(frame0,f'{xlen:.2f}',x1-((x1-x2)/2),min(y1,y2)-8,center=True,color='red')
-            draw.add_text(frame0,f'Area: {carea:.2f}',x3,y3+8,center=True,top=True,color='red')
-            if alen:
-                draw.add_text(frame0,f'Avg: {alen:.2f}',x3,y3+34,center=True,top=True,color='green')           
-            if x2 <= x1:
-                draw.add_text(frame0,f'{ylen:.2f}',x1+4,(y1+y2)/2,middle=True,color='red')
-                draw.add_text(frame0,f'{llen:.2f}',x2-4,y2-4,right=True,color='green')
+            if not mouse_mark:
+                text.append(f'LAST CLICK: NONE')
             else:
                 draw.add_text(frame0,f'{ylen:.2f}',x1-4,(y1+y2)/2,middle=True,right=True,color='red')
                 draw.add_text(frame0,f'{llen:.2f}',x2+8,y2-4,color='green')

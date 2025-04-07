@@ -15,9 +15,8 @@ SHOULDER_GEAR_RATIO = 2.5
 DEFAULT_VELOCITY = 5
 
 brain = Brain()
-base = Motor(Ports.PORT1, False)
-shoulder = Motor(Ports.PORT2, False)
-shoulder.set_reversed(True)
+base = Motor(Ports.PORT1, True)
+shoulder = Motor(Ports.PORT2, True)
 elbow = Motor(Ports.PORT3, False)
 magnet = Electromagnet(Ports.PORT6)
 
@@ -55,7 +54,7 @@ def drop_move(angles):
     move(angles)
 
     if magnet.installed():
-        magnet.drop(duration=250, units=MSEC, power=100)
+        magnet.drop(duration=250, units=MSEC, power=99)
 
 
 def print_message_to_screen(message):
