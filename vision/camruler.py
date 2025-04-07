@@ -46,12 +46,6 @@ norm_beta = 255
 # read config file
 #-------------------------------
 
-# you can make a config file "camruler_config.csv"
-# this is a comma-separated file with one "item,value" pair per line
-# you can also use a "=" separated pair like "item=value"
-# you can use # to comment a line
-# the items must be named like the default variables above
-
 # read local config values
 configfile = 'camruler_config.csv'
 if os.path.isfile(configfile):
@@ -631,7 +625,7 @@ while 1:
 
         with open(log_file, 'a', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=["iteration", "mid_x", "mid_y", "width", "height", "area"])
-            if write_header:
+            if iteration == 0:
                 writer.writeheader()
             writer.writerows(object_log)
 
