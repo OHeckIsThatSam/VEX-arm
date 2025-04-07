@@ -43,7 +43,7 @@ class Config:
             pixel_base=(int, 5),
             unit_suffix=(str, "mm")
         )
-        self.filepath = "C:\\Users\\lewis\\Desktop\\VEX-arm\\vision\\camruler_config.txt"
+        self.filepath = f"{os.getcwd()}\\camruler_config.txt"
         self.values = dict()
         self.load()
 
@@ -86,7 +86,7 @@ class Calibration:
         self.pixel_base = pixel_base
         self.cal_base = cal_base
         self.cal_range = cal_range
-        self.filepath = "C:\\Users\\lewis\\Desktop\\VEX-arm\\vision\\camruler_calibration.txt"
+        self.filepath = f"{os.getcwd()}\\camruler_calibration.txt"
         self.diagonal_frame_size = diagonal_frame_size
         self.values = dict()
         self.load()
