@@ -5,5 +5,5 @@ Z_LIMIT = [0, 69]
 
 # Set calculations config
 DECIMAL_PLACES = 1
-# Positive tolerance to increase coords by due to flex, tool configuration and target item
+# Positive tolerance to increase coords by due to flex, tool configuration and target item height
 Z_AXIS_TOLERANCE = 17

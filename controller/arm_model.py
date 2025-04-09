@@ -3,14 +3,16 @@ from visual_kinematics.RobotSerial import *
 
 class ArmModel():
     def __init__(self, x_limit, y_limit, z_limit):
-        # Using Denavit-Hartenberg (DH) notation for representation of arm properties
+        # Using Denavit-Hartenberg (DH) notation for representation of arm's construction
         # DH modelling file found in /DH/ArmDH.kinbin, used by "Robotic Arm Kinematic GUI - Part of MRPT"
         #                      [d, a, alpha, theta]
         dh_params = np.array([[17.0, 0., 90.0 * pi / 180, 0.],
                           [0., 11.5, 0., 3 * pi / 180],
                           [0., 11.0, 0., -90.0 * pi / 180]])
 
-        # Electro magnet tool DH
+        # Electro magnet tool DH is unused by the model as the joint self orientates down.
+        # It's height is factored into the target coordinates resulting in the target being reached
+        # with the tool directly above regardless of the orientation of the end frame.
         # [0., 7.6, 0., 37 * pi / 180]
 
         self.model = RobotSerial(
