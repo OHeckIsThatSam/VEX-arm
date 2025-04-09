@@ -65,16 +65,20 @@ def choose_target_object(filtered_objects):
     # decide on what the system should achieve with the blocks
     return min(filtered_objects, key=lambda o: (o.mid_x**2 + o.mid_y**2))
 
-def get_motor_positions(x, y):
-    return {"joint1": 0, "joint2": 0, "joint3": 0}
-
 def send_command(joint_commands): # Placeholder, replace with serial communication
     print(f"[COMMAND] Moving to: {joint_commands}")
     serial.send_data(joint_commands)
 
-def receive_command(): # Placeholder, replace with serial communcation
-    # Here we wait for the vex to report that it has finished moving and is awaiting the next instruction
-    print(f"[COMMAND] Awaiting reponse from VEX brain")
+def receive_command():
+    print(f"[COMMAND] Awaiting response from VEX brain")
+    response = serial.receive_data()
+
+    if response is "":
+        print("[COMMAND] Communication port couldn't be opened")
+        return
+    
+    # Temp print response (do whatever necessary with response)
+    print(f"[COMMAND] Response received: {response}")
 
 def main():
     arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
@@ -109,7 +113,7 @@ def main():
         is_pickup = True
         
         send_command(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
-        sleep(10)
+
         # Wait for response
         receive_command()
 

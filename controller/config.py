@@ -7,3 +7,9 @@ Z_LIMIT = [0, 69]
 DECIMAL_PLACES = 1
 # Positive tolerance to increase coords by due to flex, tool configuration and target item height
 Z_AXIS_TOLERANCE = 17
+
+# Serial Port config
+# Usually COM4 for wireless connection with controller and
+# COM6 for wired connection with VEX brain but check before running app
+SERIAL_PORT = "COM4"
+SERIAL_BAUDRATE = 115200

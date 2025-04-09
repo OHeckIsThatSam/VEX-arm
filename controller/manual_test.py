@@ -38,6 +38,9 @@ def main():
         input()
         
         serial.send_data(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
+        response = serial.receive_data()
+
+        print(response)
 
 
 if __name__ == "__main__":
