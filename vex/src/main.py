@@ -11,9 +11,15 @@
 # Library imports
 from vex import *
 
+# Initialise Constants
 SHOULDER_GEAR_RATIO = 2.5
 DEFAULT_VELOCITY = 5
 
+SERIAL_PORT = "/dev/serial1"
+# Mode is read and write in binary
+SERIAL_MODE = "rwb"
+
+# Initialise VEX Arm Components
 brain = Brain()
 base = Motor(Ports.PORT1, True)
 shoulder = Motor(Ports.PORT2, True)
@@ -81,9 +87,9 @@ def alarm_monitor():
 
 def serial_monitor():
     try:
-      serial = open('/dev/serial1','rb')
+      serial = open(SERIAL_PORT, SERIAL_MODE)
     except:
-      raise Exception('serial port not available')
+      raise Exception("Serial port not available")
   
     global alarm_running
     global alarm_message
@@ -122,6 +128,8 @@ def serial_monitor():
                 drop_move(joint_angles)
 
         
+
+        serial.write("Done".encode())
 
 
 try:

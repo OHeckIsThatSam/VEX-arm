@@ -27,7 +27,7 @@ if os.path.exists(log_file):
     open(log_file, 'w').close()
 
 # Config fallbacks
-camera_id = 2
+camera_id = 1
 camera_width = 1920
 camera_height = 1080
 camera_frame_rate = 30
@@ -106,7 +106,7 @@ unit_suffix = 'mm'
 pixel_base = 5
 
 # maximum field of view from center to farthest edge
-cal_range = 28
+cal_range = 53
 
 # initial calibration values table {pixels:scale}
 # this is based on the frame size and the cal_range

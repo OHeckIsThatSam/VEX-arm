@@ -2,8 +2,14 @@ import csv
 import threading
 import time
 import math
+import os
 from datetime import datetime, timezone
 from collections import namedtuple
+import config
+from arm_model import ArmModel
+import serial_communication as serial
+from time import sleep
+
 
 # Config file name
 OBJECT_LOG_PATH = "object_log.csv"
@@ -136,138 +142,57 @@ def decide_target_objects_destination(objects):
     return assigned_targets
 
 
-def get_motor_positions(x, y): # Placeholder, replace with kinematics
-    return {"joint1": 0, "joint2": 0, "joint3": 0}
+def send_command(joint_commands): # Placeholder, replace with serial communication
+    print(f"[COMMAND] Moving to: {joint_commands}")
+    serial.send_data(joint_commands)
 
-def send_command(target_position): # Placeholder, replace with serial communication
-    print(f"[SERIAL COMMUNICATION] Sending instructions for: {target_position}")
-    # TODO: this
+def receive_command():
+    print(f"[COMMAND] Awaiting response from VEX brain")
+    response = serial.receive_data()
 
-def receive_message():
-    global TIMEOUT, SERIAL_COMM_RETRIES
-    print(f"[SERIAL COMMUNICATION] Awaiting response message from vex brain...")
-
-    for attempt in range(1, SERIAL_COMM_RETRIES + 1):
-        print(f"[SERIAL COMMUNICATION] Attempt {attempt} of {SERIAL_COMM_RETRIES}...")
-
-        start_time = time.time()
-        while time.time() - start_time < TIMEOUT:
-            message = read_serial_message()  # TODO: plug in our serial comm function
-            if message:
-                print(f"[SERIAL COMMUNICATION] Received message: {message}")
-                return message
-
-            time.sleep(0.1)
-
-        print(f"[SERIAL COMMUNICATION] Timeout on attempt {attempt}. Retrying...")
-
-    print(f"[SERIAL COMMUNICATION] All attempts failed after {SERIAL_COMM_RETRIES} tries.")
-    return None
-
-def receieve_command(): # Placeholder, replace with serial communcation
-    # Here we wait for the vex to report that it has finished moving and is awaiting the next instruction
-    print(f"[COMMAND] Awaiting reponse from VEX brain")
+    if response is "":
+        print("[COMMAND] Communication port couldn't be opened")
+        return
+    
+    # Temp print response (do whatever necessary with response)
+    print(f"[COMMAND] Response received: {response}")
 
 def main():
-    global objects
+    arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
+
     print("[Master] Starting task...")
-    print("[Master] Starting object_updater_thread...")
-    thread = threading.Thread(target=object_updater_thread, daemon=True)
-    thread.start()
+    while True:
+        objects = read_objects(LOG_FILE)
+        print(f"[Master] Read {len(objects)} objects from log")
 
-    with objects_lock:
-        current_objects = objects
-    
-    lost_connection = False
-    while lost_connection is False:
-        # Safely copy the current set of objects
-        with objects_lock:
-            current_objects = list(objects)
+        filtered = filter_objects(objects)
+        print(f"[Master] {len(filtered)} objects passed filtering")
 
-        target_order = decide_target_objects_order(current_objects)
-        if not target_order:
+        target = choose_target_object(filtered)
+        if not target:
             print("[Master] No valid targets found.")
-            # Optional: send alarm to VEX brain here
-            time.sleep(5)
-            continue  # Retry after delay
+            sleep(1)
+            continue
 
-        destinations = decide_target_objects_destination(target_order)
+        print(f"[Master] Chosen target at ({target.mid_x}, {target.mid_y}), area={target.area}")
 
-        for current_x, current_y, deadzone_x, deadzone_y, target_x, target_y in destinations:
-            # Skip if no target assigned (fallback behavior)
-            if target_x is None or target_y is None:
-                print(f"[Master] No target assigned for object at ({current_x}, {current_y})")
-                continue
+        motor_positions = arm.calc_joint_degrees(x=target.mid_x, y=target.mid_y, z=config.Z_AXIS_TOLERANCE)
+        print(f"[Master] Current motor state: {motor_positions}")
 
-            motor_positions_origin = get_motor_positions(current_x, current_y)
-            motor_positions_deadzone = get_motor_positions(deadzone_x, deadzone_y)
-            motor_positions_dropoff = get_motor_positions(target_x, target_y)
+        if not motor_positions[0]:
+            print("[Master] Can't move to location")
+            sleep(5)
+            continue
+        
+        base_angle = round(motor_positions[1], 1)
+        shoulder_angle = round(motor_positions[2], 1)
+        elbow_angle = round(motor_positions[3], 1)
+        is_pickup = True
+        
+        send_command(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
 
-            print(f"[Master] Moving from ({current_x}, {current_y}) to : ({target_x}, {target_y})")
-
-            # Move to object origin
-            # TODO: Send motor positions to the robot
-            #send_command(motor_positions_origin)
-            print(f"[Master] Awaiting vex brain confirmation message...")
-            if recieve_message() is None:
-                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
-                lost_connection = True
-                break
-
-            # Move to object deadzone
-            # TODO: Send motor positions to the robot
-            # send_command(motor_positions_origin)
-            if recieve_message() is False:
-                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
-                lost_connection = True
-                break
-
-            current_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
-
-            # Wait for fresh object data with updated object locations
-            print("[Master] Waiting for object list update after movement...")
-
-            while True:
-                with objects_lock:
-                    updated_objects = list(objects)
-
-                if any(o.timestamp > current_timestamp for o in updated_objects):
-                    break
-
-                time.sleep(0.5)
-
-
-            # Create a loop out of this where it retries sending the origin coords (or gets new coords from the found object, the block may have been moved)
-            success = False
-            while success is False:
-                # Check for any object near target origin — assume pickup succeeded if none are near
-                found = False
-                for obj in updated_objects:
-                    dist = ((obj.mid_x - target_x) ** 2 + (obj.mid_y - target_y) ** 2) ** 0.5
-                    if dist < 10:
-                        found = True
-                        print(f"[Master] Object still near origin, retrying pickup...")
-                        break
-
-                
-                        
-            if success:
-                print(f"[Master] Successfully picked object from ({current_x}, {current_y}), continuing with instruction...")
-            else:
-                print(f"[Master] Retry or handle failure case here.")
-
-            # Move to object target
-            # TODO: Send motor positions to the robot
-            #send_command(motor_positions_origin)
-            if recieve_message(timeout) is False:
-                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
-
-            # Short cooldown between actions, testing to confirm whether this is needed or not
-            time.sleep(1)
-
-        # If we add more afer this, uncomment the following line so that we break out of the loop when the connection to the vex brain has been determined as lost
-        # if lost_connection:
-        #   continue
+        # Wait for response
+        receive_command()
 
 if __name__ == "__main__":
     main()
