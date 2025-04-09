@@ -13,11 +13,11 @@ import frame_capture
 import frame_draw
 
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 
 # --- Object logging ---
 object_log = []
-log_interval = 5  # seconds
+log_interval = 1  # seconds
 last_log_time = time.time()
 log_file = "object_log.csv"
 iteration = 0
@@ -27,7 +27,7 @@ if os.path.exists(log_file):
     open(log_file, 'w').close()
 
 # Config fallbacks
-camera_id = 0
+camera_id = 2
 camera_width = 1920
 camera_height = 1080
 camera_frame_rate = 30
@@ -531,6 +531,7 @@ while 1:
 
             # log object data
             object_log.append({
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f"),
                 "iteration": iteration,
                 "mid_x": round(x3c, 2),
                 "mid_y": round(y3c, 2),
@@ -624,7 +625,7 @@ while 1:
         write_header = not os.path.exists(log_file)
 
         with open(log_file, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=["iteration", "mid_x", "mid_y", "width", "height", "area"])
+            writer = csv.DictWriter(f, fieldnames=["timestamp", "iteration", "mid_x", "mid_y", "width", "height", "area"])
             if iteration == 0:
                 writer.writeheader()
             writer.writerows(object_log)

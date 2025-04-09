@@ -65,6 +65,19 @@ def print_message_to_screen(message):
         brain.screen.set_cursor(i + 1, 1)
         brain.screen.print(message[i])
 
+def send_serial_message():
+    pass
+
+aThread = None
+alarm_running = False
+alarm_message = None
+
+def alarm_monitor():
+    global alarm_running, alarm_message
+    while alarm_running:
+        print_message_to_screen(alarm_message)
+        brain.play_sound(SoundType.ALARM)
+        wait(100, MSEC)
 
 def serial_monitor():
     try:
@@ -72,6 +85,9 @@ def serial_monitor():
     except:
       raise Exception('serial port not available')
   
+    global alarm_running
+    global alarm_message
+
     while True:
         data = serial.readline()
         
@@ -80,25 +96,36 @@ def serial_monitor():
         
         data_array = data.split()
 
-        joint_angles = []
-        for angle in data_array[:3]:
-            joint_angles.append(float(angle))
-        
-        is_pickup = data_array[3]
-        
-        brain.screen.clear_screen()
-        brain.screen.set_cursor(1, 1)
-        brain.screen.print(is_pickup)
-        brain.screen.set_cursor(2,1)
-        brain.screen.print(joint_angles)
-        
-        if is_pickup:
-            pickup_move(joint_angles)
+        # Length 1 = Error message
+        # Otherwise the message is normal
+        if len(data_array) == 1:
+            alarm_running = True
+            alarm_message = data_array
         else:
-            drop_move(joint_angles)
+            alarm_running = False
+            alarm_message = None
+            joint_angles = []
+            for angle in data_array[:3]:
+                joint_angles.append(float(angle))
+            
+            is_pickup = data_array[3]
+            
+            brain.screen.clear_screen()
+            brain.screen.set_cursor(1, 1)
+            brain.screen.print(is_pickup)
+            brain.screen.set_cursor(2,1)
+            brain.screen.print(joint_angles)
+            
+            if is_pickup:
+                pickup_move(joint_angles)
+            else:
+                drop_move(joint_angles)
+
+        
 
 
 try:
+    alarm_thread=Thread(alarm_monitor)
     t1=Thread(serial_monitor)
 except Exception as ex:
     handle_exception(ex)
