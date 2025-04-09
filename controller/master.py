@@ -1,17 +1,23 @@
 import csv
+import os
 from datetime import datetime
 from collections import namedtuple
+import config
+from arm_model import ArmModel
+import serial_communication as serial
+from time import sleep
+
 
 # Config file name
-LOG_FILE = "object_log.csv"
+LOG_FILE = os.path.join(os.getcwd(), 'object_log.csv')
 
 # Filtering rules, these are used to ensure that objects detected at least match the expected size, values in MM
-MIN_WIDTH = 30.0
-MAX_WIDTH = 80.0
-MIN_HEIGHT = 30.0
-MAX_HEIGHT = 80.0
-MIN_AREA = 200.0
-MAX_AREA = 1000.0
+MIN_WIDTH = 4.0
+MAX_WIDTH = 8.0
+MIN_HEIGHT = 5
+MAX_HEIGHT = 8.0
+MIN_AREA = 20.0
+MAX_AREA = 100.0
 
 # CSV data structure, must match camruler.py output to object_log.csv
 DetectedObject = namedtuple("DetectedObject", ["iteration", "mid_x", "mid_y", "width", "height", "area"])
@@ -20,6 +26,7 @@ DetectedObject = namedtuple("DetectedObject", ["iteration", "mid_x", "mid_y", "w
 
 def read_objects(log_path):
     # Here we read in the latest objects written to the object log
+    print(f"Reading from path: {log_path}")
     objects = []
     with open(log_path, newline='') as f:
         reader = csv.DictReader(f)
@@ -58,35 +65,53 @@ def choose_target_object(filtered_objects):
     # decide on what the system should achieve with the blocks
     return min(filtered_objects, key=lambda o: (o.mid_x**2 + o.mid_y**2))
 
-def get_motor_positions(): # Placeholder, replace with kinematics
+def get_motor_positions(x, y):
     return {"joint1": 0, "joint2": 0, "joint3": 0}
 
-def send_command(target_position): # Placeholder, replace with serial communication
-    print(f"[COMMAND] Moving to: {target_position}")
+def send_command(joint_commands): # Placeholder, replace with serial communication
+    print(f"[COMMAND] Moving to: {joint_commands}")
+    serial.send_data(joint_commands)
 
-def receieve_command(): # Placeholder, replace with serial communcation
+def receive_command(): # Placeholder, replace with serial communcation
     # Here we wait for the vex to report that it has finished moving and is awaiting the next instruction
     print(f"[COMMAND] Awaiting reponse from VEX brain")
 
 def main():
+    arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
+
     print("[Master] Starting task...")
-    objects = read_objects(LOG_FILE)
-    print(f"[Master] Read {len(objects)} objects from log")
+    while True:
+        objects = read_objects(LOG_FILE)
+        print(f"[Master] Read {len(objects)} objects from log")
 
-    filtered = filter_objects(objects)
-    print(f"[Master] {len(filtered)} objects passed filtering")
+        filtered = filter_objects(objects)
+        print(f"[Master] {len(filtered)} objects passed filtering")
 
-    target = choose_target_object(filtered)
-    if not target:
-        print("[Master] No valid targets found.")
-        return
+        target = choose_target_object(filtered)
+        if not target:
+            print("[Master] No valid targets found.")
+            sleep(1)
+            continue
 
-    print(f"[Master] Chosen target at ({target.mid_x}, {target.mid_y}), area={target.area}")
+        print(f"[Master] Chosen target at ({target.mid_x}, {target.mid_y}), area={target.area}")
 
-    motor_positions = get_motor_positions()
-    print(f"[Master] Current motor state: {motor_positions}")
+        motor_positions = arm.calc_joint_degrees(x=target.mid_x, y=target.mid_y, z=config.Z_AXIS_TOLERANCE)
+        print(f"[Master] Current motor state: {motor_positions}")
 
-    send_command((target.mid_x, target.mid_y))
+        if not motor_positions[0]:
+            print("[Master] Can't move to location")
+            sleep(5)
+            continue
+        
+        base_angle = round(motor_positions[1], 1)
+        shoulder_angle = round(motor_positions[2], 1)
+        elbow_angle = round(motor_positions[3], 1)
+        is_pickup = True
+        
+        send_command(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
+        sleep(10)
+        # Wait for response
+        receive_command()
 
 if __name__ == "__main__":
     main()

@@ -33,12 +33,13 @@ def main():
         shoulder_angle = round(results[2], config.DECIMAL_PLACES)
         elbow_angle = round(results[3], config.DECIMAL_PLACES)
 
+        model.model.show(True, True)
+        print(results)       
+        print(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
+
         # If the position entered cannot be reached by the arm then continue
         if (results[0] == False):
             continue
-
-        print(np.array2string(results))       
-        print(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
 
         # Hold for user input
         input()

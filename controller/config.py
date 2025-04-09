@@ -1,9 +1,9 @@
 # Set distances defined by camera config
-X_LIMIT = [-25.5, 25.5] # 51cm max
-Y_LIMIT = [-13, 13] # 26cm max
-Z_LIMIT = [0, 46]
+X_LIMIT = [-47, 47] # 51cm max
+Y_LIMIT = [-27, 27] # 26cm max
+Z_LIMIT = [0, 69]
 
 # Set calculations config
 DECIMAL_PLACES = 1
 # Positive tolerance to increase coords by due to flex, tool configuration and target item
-Z_AXIS_TOLERANCE = 10
+Z_AXIS_TOLERANCE = 17

@@ -6,12 +6,12 @@ class ArmModel():
         # Using Denavit-Hartenberg (DH) notation for representation of arm properties
         # DH modelling file found in /DH/ArmDH.kinbin, used by "Robotic Arm Kinematic GUI - Part of MRPT"
         #                      [d, a, alpha, theta]
-        dh_params = np.array([[17.5, 0., 90.0 * pi / 180, 0.],
-                          [0., 15, 0., 3 * pi / 180],
-                          [0., 11.2, 0., -90.0 * pi / 180]])
+        dh_params = np.array([[17.0, 0., 90.0 * pi / 180, 0.],
+                          [0., 11.5, 0., 3 * pi / 180],
+                          [0., 11.0, 0., -90.0 * pi / 180]])
 
         # Electro magnet tool DH
-        # [0., 7.3, 0., 0.]
+        # [0., 7.6, 0., 37 * pi / 180]
 
         self.model = RobotSerial(
             dh_params=dh_params,
@@ -21,13 +21,28 @@ class ArmModel():
             max_iter=1000)
 
 
-    def calc_joint_degrees(self, x, y, z):
+    def calc_joint_degrees(self, x, y, z) -> list:
         """
             Uses inverse kinematics to calculate the angles at each joint for the manipulators
             end frame to reach the supplied coordinates. Returns best attempt if coordinates
             are unreachable.
-            Returns: array [bool for if reachable, joint 1 angle, joint 2 angle 2, joint 3 angle ]  
+
+            Parameters
+            ----------
+            x: float
+                Target x coordinate.
+            y: float
+                Target y coordinate.
+            z: float
+                Target z coordinate.
+            
+            Returns
+            -------
+            angles: list 
+                List containing joint angels and if position reachable [bool, float, float, float]
         """
+        self.model.forward([self.determine_quadrant_angle(x,y), 0, 0])
+
         target_position = np.array([[x], [y], [z]])
         # a, b, c - degrees of rotation of the z, y, x axes from the base axes
         # default to 0 i.e tool always faces same as x in default position 
@@ -37,22 +52,44 @@ class ArmModel():
         self.model.inverse(end)
 
         axis_values = self.model.axis_values
-        base_rotation = self.rad_to_deg(axis_values[0])
-        elbow_rotation = self.rad_to_deg(axis_values[1])
-        wrist_rotation = self.rad_to_deg(axis_values[2])
-        return np.array(
-            [
-                self.model.is_reachable_inverse, 
-                base_rotation, 
-                elbow_rotation, 
-                wrist_rotation
-            ])
+        base_rotation = rad_to_deg(axis_values[0])
+        elbow_rotation = rad_to_deg(axis_values[1])
+        wrist_rotation = rad_to_deg(axis_values[2])
+        return [
+            self.model.is_reachable_inverse, 
+            base_rotation, 
+            elbow_rotation, 
+            wrist_rotation
+        ]
+
+    
+    def determine_quadrant_angle(_self, x: float, y: float) -> float:
+        """
+        Calculates the angle of the base joint which would put the arm in the middle of the targets quadrant.
+        Given the arms centre (the axis the base revolves around) is 0,0. The base's plane is split into the
+        quadrants as if looking top-down onto this plane.
+
+        Parameters
+        ----------
+        x: float
+            The targets x coordinate.
+        y: float
+            The targets y coordinate.
+
+        Returns
+        -------
+        angle: float
+            The degrees of rotation on for the base joint.
+        """
+        if x >= 0 and y >= 0:
+            return 45.0
+        elif x >= 0 and y < 0:
+            return -45.0
+        elif x < 0 and y >= 0:
+            return 135
+        else:
+            return -135
 
 
-    def rad_to_deg(_self, rad):
-        return (rad * 180) / pi
-    
-    
-    # Visual representation temporary for debug
-    def show(self):
-        self.model.show()
+def rad_to_deg(rad):
+    return (rad * 180) / pi
