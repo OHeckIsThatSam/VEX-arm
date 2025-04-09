@@ -23,7 +23,7 @@ class ArmModel():
             max_iter=1000)
 
 
-    def calc_joint_degrees(self, x, y, z) -> list:
+    def calc_joint_degrees(self, x, y, z, dec_places=1) -> list:
         """
             Uses inverse kinematics to calculate the angles at each joint for the manipulators
             end frame to reach the supplied coordinates. Returns best attempt if coordinates
@@ -59,9 +59,9 @@ class ArmModel():
         wrist_rotation = rad_to_deg(axis_values[2])
         return [
             self.model.is_reachable_inverse, 
-            base_rotation, 
-            elbow_rotation, 
-            wrist_rotation
+            round(base_rotation, dec_places), 
+            round(elbow_rotation, dec_places), 
+            round(wrist_rotation, dec_places)
         ]
 
     

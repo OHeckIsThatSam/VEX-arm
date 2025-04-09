@@ -1,18 +1,12 @@
-import csv
-import threading
-import time
-import math
-import os
-from datetime import datetime, timezone
+import os, csv, threading, time, math, config
+from datetime import datetime
 from collections import namedtuple
-import config
 from arm_model import ArmModel
 import serial_communication as serial
-from time import sleep
 
 
 # Config file name
-OBJECT_LOG_PATH = "object_log.csv"
+OBJECT_LOG_PATH = os.path.join(os.getcwd(), "object_log.csv") 
 
 # Filtering rules, these are used to ensure that objects detected at least match the expected size, values in CM
 MIN_WIDTH = 3.0
@@ -70,11 +64,11 @@ def read_objects():
         max_iteration = local_objects[-1].iteration
         local_objects = [obj for obj in local_objects if obj.iteration == max_iteration]
     
-    print(f"[Object Updater Thread] {len(local_objects)} have passed validation and been added to objects")
+    #print(f"[Object Updater Thread] {len(local_objects)} have passed validation and been added to objects")
 
-    objects.append(local_objects)
+    return local_objects
 
-def object_updater_thread(log_path):
+def object_updater_thread():
     global objects
     print("[Object Updater Thread] Started...")
     while True:
@@ -141,58 +135,122 @@ def decide_target_objects_destination(objects):
 
     return assigned_targets
 
-
-def send_command(joint_commands): # Placeholder, replace with serial communication
-    print(f"[COMMAND] Moving to: {joint_commands}")
-    serial.send_data(joint_commands)
-
-def receive_command():
-    print(f"[COMMAND] Awaiting response from VEX brain")
-    response = serial.receive_data()
-
-    if response is "":
-        print("[COMMAND] Communication port couldn't be opened")
-        return
-    
-    # Temp print response (do whatever necessary with response)
-    print(f"[COMMAND] Response received: {response}")
-
 def main():
-    arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
-
+    global objects
     print("[Master] Starting task...")
-    while True:
-        objects = read_objects(LOG_FILE)
-        print(f"[Master] Read {len(objects)} objects from log")
 
-        filtered = filter_objects(objects)
-        print(f"[Master] {len(filtered)} objects passed filtering")
+    print("[Master] Initialising VEX arm model...")
+    arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
+   
+    print("[Master] Starting object_updater_thread...")
+    thread = threading.Thread(target=object_updater_thread, daemon=True)
+    thread.start()
+    
+    lost_connection = False
+    while lost_connection is False:
+        # Safely copy the current set of objects
+        with objects_lock:
+            current_objects = objects
 
-        target = choose_target_object(filtered)
-        if not target:
+        target_objects = decide_target_objects_order(current_objects)
+        if not target_objects:
             print("[Master] No valid targets found.")
-            sleep(1)
-            continue
+            # Optional: send alarm to VEX brain here
+            time.sleep(5)
+            continue  # Retry after delay
 
-        print(f"[Master] Chosen target at ({target.mid_x}, {target.mid_y}), area={target.area}")
+        destinations = decide_target_objects_destination(target_objects)
 
-        motor_positions = arm.calc_joint_degrees(x=target.mid_x, y=target.mid_y, z=config.Z_AXIS_TOLERANCE)
-        print(f"[Master] Current motor state: {motor_positions}")
+        for object_x, object_y, destination_x, destination_y in destinations:
+            # Skip if no target assigned (fallback behaviour)
+            if destination_x is None or destination_y is None:
+                print(f"[Master] No target position assigned for object at ({object_x}, {object_y})")
+                continue
+            
+            print("[Master] Calculating angles for pickup...")
+            joint_angles_pickup = arm.calc_joint_degrees(object_x, object_y, config.Z_AXIS_TOLERANCE)
 
-        if not motor_positions[0]:
-            print("[Master] Can't move to location")
-            sleep(5)
-            continue
-        
-        base_angle = round(motor_positions[1], 1)
-        shoulder_angle = round(motor_positions[2], 1)
-        elbow_angle = round(motor_positions[3], 1)
-        is_pickup = True
-        
-        send_command(f"{base_angle} {shoulder_angle} {elbow_angle} {is_pickup}")
+            if not joint_angles_pickup[0]:
+                print(f"[Master] Pickup position ({object_x}, {object_y}) is unreachable")
+                continue
+                
+            print("[Master] Sending command to VEX...")
+            # Send command from joint angles and set pickup to be true
+            serial.send_data(f"{joint_angles_pickup[1]} {joint_angles_pickup[2]} {joint_angles_pickup[3]} {True}")
 
-        # Wait for response
-        receive_command()
+            print(f"[Master] Awaiting vex brain confirmation message...")
+            response = serial.receive_data(TIMEOUT)
+            if response == "":
+                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
+                lost_connection = True
+                break
+                
+            # Send command to Move arm to deadzone to unblock view for camera
+            # TODO: Calculate deadzone angles for arm, currently use defaults
+            serial.send_data(f"{0} {90} {0} {True}")
+            
+            print(f"[Master] Awaiting vex brain confirmation message...")
+            response = serial.receive_data(TIMEOUT)
+            if response == "":
+                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
+                lost_connection = True
+                break
+
+            current_timestamp = datetime.now()
+
+            print("[Master] Waiting for object list update after movement...")
+            while True:
+                with objects_lock:
+                    updated_objects = objects
+
+                print(updated_objects)
+
+                # Find objects added to object log by camera after movement timestamp
+                if any(o.timestamp > current_timestamp for o in updated_objects):
+                    break
+
+                time.sleep(0.5)
+            
+            # TODO: Loop resend pickup coords if object has not been picked up. May need some retry algo that hones in on the object
+            # Create a loop out of this where it retries sending the origin coords (or gets new coords from the found object, the block may have been moved)
+            # success = False
+            # while success is False:
+            #     # Check for any object near target origin — assume pickup succeeded if none are near
+            #     found = False
+            #     for obj in updated_objects:
+            #         dist = ((obj.mid_x - destination_x) ** 2 + (obj.mid_y - destination_y) ** 2) ** 0.5
+            #         if dist < 10:
+            #             found = True
+            #             print(f"[Master] Object still near origin, retrying pickup...")
+            #             break
+
+            # if success:
+            #     print(f"[Master] Successfully picked object from ({object_x}, {object_y}), continuing with instruction...")
+            # else:
+            #     print(f"[Master] Retry or handle failure case here.")
+
+            print("[MASTER] calculating drop off joint angles...")
+            joint_angles_dropoff = arm.calc_joint_degrees(destination_x, destination_y, config.Z_AXIS_TOLERANCE)
+
+            if not joint_angles_dropoff[0]:
+                print(f"[Master] Drop off position ({destination_x}, {destination_y}) is unreachable")
+                continue
+
+            serial.send_data(f"{joint_angles_dropoff[1]} {joint_angles_dropoff[2]} {joint_angles_dropoff[3]} {False}")
+            print(f"[Master] Awaiting vex brain confirmation message...")
+            response = serial.receive_data(TIMEOUT)
+            if response == "":
+                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
+                lost_connection = True
+                break
+
+            # Short cool down between actions, testing to confirm whether this is needed or not
+            time.sleep(1)
+        # Slight break between iterations
+        time.sleep(1)
+        # If we add more after this, uncomment the following line so that we break out of the loop when the connection to the vex brain has been determined as lost
+        # if lost_connection:
+        #   continue
 
 if __name__ == "__main__":
     main()

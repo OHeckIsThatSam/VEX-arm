@@ -1,7 +1,7 @@
 import serial, time, config
 
 
-def send_data(data):
+def send_data(data: str):
     data += "\r\n"
 
     ser = serial.Serial(config.SERIAL_PORT, config.SERIAL_BAUDRATE)
@@ -11,17 +11,17 @@ def send_data(data):
         ser.close()
 
 
-def receive_data() -> str:
+def receive_data(timeout=20) -> str:
     ser = serial.Serial(config.SERIAL_PORT, config.SERIAL_BAUDRATE)
     
     if not ser.is_open:
         return ""
     
-    while True:
+    for i in range(timeout):
         size = ser.inWaiting()
         if size != 0:
             data = ser.read(size)
             return data.decode()
         else:
             time.sleep(1)
-        
+    return ""
