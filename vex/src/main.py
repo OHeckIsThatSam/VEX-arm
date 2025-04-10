@@ -29,7 +29,6 @@ magnet = Electromagnet(Ports.PORT6)
 arm = MotorGroup(base, shoulder, elbow)
 arm.set_stopping(HOLD)
 arm.set_velocity(DEFAULT_VELOCITY, PERCENT)
-magnet.set_power(100)
 
 
 def handle_exception(ex):
@@ -45,14 +44,14 @@ def move(angles):
     elbow.spin_to_position(0, DEGREES)
 
     # Move to target position
-    base.spin_to_position(angles[0], DEGREES)
-    elbow.spin_to_position(angles[2], DEGREES)
-    shoulder.spin_to_position(angles[1] * SHOULDER_GEAR_RATIO, DEGREES)
+    base.spin_to_position(angles[0], DEGREES, wait=True)
+    elbow.spin_to_position(angles[2], DEGREES, wait=True)
+    shoulder.spin_to_position(angles[1] * SHOULDER_GEAR_RATIO, DEGREES, wait=True)
 
 
 def pickup_move(angles):
-    if magnet.installed():
-        magnet.pickup()
+    magnet.set_power(100)
+    magnet.pickup()
 
     move(angles) 
 
@@ -60,8 +59,8 @@ def pickup_move(angles):
 def drop_move(angles):
     move(angles)
 
-    if magnet.installed():
-        magnet.drop(duration=2000)
+    magnet.set_power(100)
+    magnet.drop()
 
 
 def print_message_to_screen(message):
@@ -123,12 +122,10 @@ def serial_monitor():
             brain.screen.set_cursor(2,1)
             brain.screen.print(joint_angles)
             
-            if is_pickup:
+            if is_pickup == b'True':
                 pickup_move(joint_angles)
             else:
                 drop_move(joint_angles)
-
-        
 
         serial.write("Done".encode())
 
