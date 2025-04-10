@@ -20,7 +20,7 @@ MAX_AREA = MAX_WIDTH * MAX_HEIGHT
 MIN_DIST=10
 FORBIDDEN_Y_RANGE=(-10, 10)
 GRID_STEP=5
-GRID_LIMIT=100
+GRID_LIMIT=25
 
 # Serial communication globals
 VEX_TIMEOUT = 30
@@ -209,9 +209,11 @@ def main():
                 print(updated_objects)
 
                 # Find objects added to object log by camera after movement timestamp
-                if any(o.timestamp > current_timestamp for o in updated_objects):
+                if any(datetime.fromisoformat(o.timestamp) > current_timestamp for o in updated_objects):
                     updated = True
                     break
+                
+                print(f"[Master] Objects does not have an updated list of detected objects - iteration: {i}")
 
                 time.sleep(1)
             
