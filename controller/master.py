@@ -169,6 +169,7 @@ def main():
                 print(f"[Master] No target position assigned for object at ({object_x}, {object_y})")
                 continue
             
+            is_unreachable = False
             is_picked_up = False
             while is_picked_up is False:
                 print("[Master] Calculating angles for pickup...")
@@ -176,7 +177,8 @@ def main():
 
                 if not joint_angles_pickup[0]:
                     print(f"[Master] Pickup position ({object_x}, {object_y}) is unreachable")
-                    continue
+                    is_unreachable = True
+                    break
 
                 print("[Master] Sending command to VEX...")
                 # Send command from joint angles and set pickup to be true
@@ -226,9 +228,19 @@ def main():
                 # Check for any object near target origin — assume pickup succeeded if none are near
                 for obj in updated_objects:
                     dist = ((obj.mid_x - object_x) ** 2 + (obj.mid_y - object_y) ** 2) ** 0.5
-                    if dist > 10:
+                    if dist < 10:
+                        is_picked_up = False
+                        print(f"[Master] Object still near origin, pickup failed...")
+                        break
+                    else:
                         is_picked_up = True
-                        print(f"[Master] No object still near object origin, continuing to drop off...")
+                
+                if is_picked_up:
+                    print(f"[Master] No objects still near origin, pickup succeeded...")
+
+            if is_unreachable:
+                print("[MASTER] Unreachable object, skipping to next object...")
+                continue
 
             print("[MASTER] calculating drop off joint angles...")
             joint_angles_dropoff = arm.calc_joint_degrees(destination_x, destination_y, config.Z_AXIS_TOLERANCE)
