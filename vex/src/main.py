@@ -29,6 +29,7 @@ magnet = Electromagnet(Ports.PORT6)
 arm = MotorGroup(base, shoulder, elbow)
 arm.set_stopping(HOLD)
 arm.set_velocity(DEFAULT_VELOCITY, PERCENT)
+magnet.set_power(100)
 
 
 def handle_exception(ex):
@@ -60,7 +61,7 @@ def drop_move(angles):
     move(angles)
 
     if magnet.installed():
-        magnet.drop(duration=250, units=MSEC, power=99)
+        magnet.drop(duration=2000)
 
 
 def print_message_to_screen(message):

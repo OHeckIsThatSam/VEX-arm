@@ -1,5 +1,5 @@
 import os, csv, threading, time, math, config
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import namedtuple
 from arm_model import ArmModel
 import serial_communication as serial
@@ -9,10 +9,10 @@ import serial_communication as serial
 OBJECT_LOG_PATH = os.path.join(os.getcwd(), "object_log.csv") 
 
 # Filtering rules, these are used to ensure that objects detected at least match the expected size, values in CM
-MIN_WIDTH = 3.0
-MAX_WIDTH = 8.0
-MIN_HEIGHT = 3.0
-MAX_HEIGHT = 8.0
+MIN_WIDTH = 7.0
+MAX_WIDTH = 9.0
+MIN_HEIGHT = 7.0
+MAX_HEIGHT = 9.0
 MIN_AREA = MIN_WIDTH * MIN_HEIGHT
 MAX_AREA = MAX_WIDTH * MAX_HEIGHT
 
@@ -138,27 +138,25 @@ def decide_target_objects_destination(objects):
     return assigned_targets
 
 def main():
-    global objects
+    #global objects
     print("[Master] Starting task...")
 
     print("[Master] Initialising VEX arm model...")
     arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
    
     print("[Master] Starting object_updater_thread...")
-    thread = threading.Thread(target=object_updater_thread, daemon=True)
-    thread.start()
+    #thread = threading.Thread(target=object_updater_thread, daemon=True)
+    #thread.start()
     
     lost_connection = False
-    while lost_connection is False:
-        # Safely copy the current set of objects
-        with objects_lock:
-            current_objects = objects
+    while lost_connection is False:       
+        objects = read_objects()
 
-        target_objects = decide_target_objects_order(current_objects)
+        target_objects = decide_target_objects_order(objects)
         if not target_objects:
             print("[Master] No valid targets found.")
             # Optional: send alarm to VEX brain here
-            time.sleep(5)
+            time.sleep(2)
             continue  # Retry after delay
 
         destinations = decide_target_objects_destination(target_objects)
@@ -204,30 +202,32 @@ def main():
                     lost_connection = True
                     break
 
-                current_timestamp = datetime.now()
+                current_timestamp = datetime.now(tz=timezone.utc)
 
                 print("[Master] Waiting for object list update after movement...")
                 updated = False
                 for i in range(CAMRULER_TIMEOUT):
-                    with objects_lock:
-                        updated_objects = objects
+                    updated_objects = read_objects()
 
-                        print(updated_objects)
+                    #print(updated_objects)
 
                     # Find objects added to object log by camera after movement timestamp
-                    if any(datetime.fromisoformat(o.timestamp) > current_timestamp for o in updated_objects):
+                    if any(o.timestamp > current_timestamp for o in updated_objects) or len(updated_objects) == 0:
                         updated = True
                         break
-                    
+
                     print(f"[Master] Objects does not have an updated list of detected objects - iteration: {i}")
+                    time.sleep(1)
 
                 if updated is False:
-                    serial.send_data("Object list never updated")
+                    #serial.send_data("Object list never updated")
                     raise TimeoutError("Object list never updated")    
             
                 # Check for any object near target origin — assume pickup succeeded if none are near
                 for obj in updated_objects:
                     dist = ((obj.mid_x - object_x) ** 2 + (obj.mid_y - object_y) ** 2) ** 0.5
+                    print(obj)
+                    print(dist)
                     if dist < 10:
                         is_picked_up = False
                         print(f"[Master] Object still near origin, pickup failed...")
@@ -243,7 +243,7 @@ def main():
                 continue
 
             print("[MASTER] calculating drop off joint angles...")
-            joint_angles_dropoff = arm.calc_joint_degrees(destination_x, destination_y, config.Z_AXIS_TOLERANCE)
+            joint_angles_dropoff = arm.calc_joint_degrees(0, 13, config.Z_AXIS_TOLERANCE + 5)
 
             if not joint_angles_dropoff[0]:
                 print(f"[Master] Drop off position ({destination_x}, {destination_y}) is unreachable")

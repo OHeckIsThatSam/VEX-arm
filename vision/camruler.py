@@ -106,7 +106,7 @@ unit_suffix = 'mm'
 pixel_base = 5
 
 # maximum field of view from center to farthest edge
-cal_range = 53
+cal_range = 45
 
 # initial calibration values table {pixels:scale}
 # this is based on the frame size and the cal_range
@@ -531,7 +531,7 @@ while 1:
 
             # log object data
             object_log.append({
-                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f"),
+                "timestamp": datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f%z"),
                 "iteration": iteration,
                 "mid_x": round(x3c, 2),
                 "mid_y": round(y3c, 2),
@@ -624,10 +624,9 @@ while 1:
     if time.time() - last_log_time > log_interval and object_log:
         write_header = not os.path.exists(log_file)
 
-        with open(log_file, 'a', newline='') as f:
+        with open(log_file, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=["timestamp", "iteration", "mid_x", "mid_y", "width", "height", "area"])
-            if iteration == 0:
-                writer.writeheader()
+            writer.writeheader()
             writer.writerows(object_log)
 
         print(f"[LOG] Wrote {len(object_log)} objects to {log_file}")
