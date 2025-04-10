@@ -167,67 +167,62 @@ def main():
                 print(f"[Master] No target position assigned for object at ({object_x}, {object_y})")
                 continue
             
-            print("[Master] Calculating angles for pickup...")
-            joint_angles_pickup = arm.calc_joint_degrees(object_x, object_y, config.Z_AXIS_TOLERANCE)
+            is_picked_up = False
+            while is_picked_up is False:
+                print("[Master] Calculating angles for pickup...")
+                joint_angles_pickup = arm.calc_joint_degrees(object_x, object_y, config.Z_AXIS_TOLERANCE)
 
-            if not joint_angles_pickup[0]:
-                print(f"[Master] Pickup position ({object_x}, {object_y}) is unreachable")
-                continue
-                
-            print("[Master] Sending command to VEX...")
-            # Send command from joint angles and set pickup to be true
-            serial.send_data(f"{joint_angles_pickup[1]} {joint_angles_pickup[2]} {joint_angles_pickup[3]} {True}")
+                if not joint_angles_pickup[0]:
+                    print(f"[Master] Pickup position ({object_x}, {object_y}) is unreachable")
+                    continue
 
-            print(f"[Master] Awaiting vex brain confirmation message...")
-            response = serial.receive_data(TIMEOUT)
-            if response == "":
-                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
-                lost_connection = True
-                break
-                
-            # Send command to Move arm to deadzone to unblock view for camera
-            # TODO: Calculate deadzone angles for arm, currently use defaults
-            serial.send_data(f"{0} {90} {0} {True}")
-            
-            print(f"[Master] Awaiting vex brain confirmation message...")
-            response = serial.receive_data(TIMEOUT)
-            if response == "":
-                print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
-                lost_connection = True
-                break
+                print("[Master] Sending command to VEX...")
+                # Send command from joint angles and set pickup to be true
+                serial.send_data(f"{joint_angles_pickup[1]} {joint_angles_pickup[2]} {joint_angles_pickup[3]} {True}")
 
-            current_timestamp = datetime.now()
-
-            print("[Master] Waiting for object list update after movement...")
-            while True:
-                with objects_lock:
-                    updated_objects = objects
-
-                print(updated_objects)
-
-                # Find objects added to object log by camera after movement timestamp
-                if any(o.timestamp > current_timestamp for o in updated_objects):
+                print(f"[Master] Awaiting vex brain confirmation message...")
+                response = serial.receive_data(TIMEOUT)
+                if response == "":
+                    print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
+                    lost_connection = True
                     break
 
-                time.sleep(0.5)
-            
-            # TODO: Loop resend pickup coords if object has not been picked up. May need some retry algo that hones in on the object
-            # Create a loop out of this where it retries sending the origin coords (or gets new coords from the found object, the block may have been moved)
-            # success = False
-            # while success is False:
-            #     # Check for any object near target origin — assume pickup succeeded if none are near
-            #     found = False
-            #     for obj in updated_objects:
-            #         dist = ((obj.mid_x - destination_x) ** 2 + (obj.mid_y - destination_y) ** 2) ** 0.5
-            #         if dist < 10:
-            #             found = True
-            #             print(f"[Master] Object still near origin, retrying pickup...")
-            #             break
+                # Send command to Move arm to deadzone to unblock view for camera go to closest facing direction on the x axis
+                if abs(joint_angles_pickup[1]) >= 270 or abs(joint_angles_pickup[1]) <= 90:
+                    serial.send_data(f"{0} {90} {0} {True}")
+                else:
+                    serial.send_data(f"{180} {90} {0} {True}")
 
-            # if success:
-            #     print(f"[Master] Successfully picked object from ({object_x}, {object_y}), continuing with instruction...")
-            # else:
-            #     print(f"[Master] Retry or handle failure case here.")
+                print(f"[Master] Awaiting vex brain confirmation message...")
+                response = serial.receive_data(TIMEOUT)
+                if response == "":
+                    print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
+                    lost_connection = True
+                    break
+
+                current_timestamp = datetime.now()
+
+                print("[Master] Waiting for object list update after movement...")
+                while True:
+                    with objects_lock:
+                        updated_objects = objects
+
+                    print(updated_objects)
+
+                    # Find objects added to object log by camera after movement timestamp
+                    if any(o.timestamp > current_timestamp for o in updated_objects):
+                        break
+
+                    time.sleep(0.5)
+            
+                # TODO: Loop resend pickup coords if object has not been picked up. May need some retry algo that hones in on the object
+                # Create a loop out of this where it retries sending the origin coords (or gets new coords from the found object, the block may have been moved)
+                # Check for any object near target origin — assume pickup succeeded if none are near
+                for obj in updated_objects:
+                    dist = ((obj.mid_x - object_x) ** 2 + (obj.mid_y - object_y) ** 2) ** 0.5
+                    if dist > 10:
+                        is_picked_up = True
+                        print(f"[Master] No object still near object origin, continuing to drop off...")
 
             print("[MASTER] calculating drop off joint angles...")
             joint_angles_dropoff = arm.calc_joint_degrees(destination_x, destination_y, config.Z_AXIS_TOLERANCE)
