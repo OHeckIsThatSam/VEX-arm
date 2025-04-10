@@ -23,8 +23,10 @@ GRID_STEP=5
 GRID_LIMIT=100
 
 # Serial communication globals
-TIMEOUT = 30
+VEX_TIMEOUT = 30
 SERIAL_COMM_RETRIES = 3
+
+CAMRULER_TIMEOUT = 30
 
 # CSV data structure, must match camruler.py output to object_log.csv
 DetectedObject = namedtuple("DetectedObject", ["timestamp", "iteration", "mid_x", "mid_y", "width", "height", "area"])
@@ -179,7 +181,7 @@ def main():
             serial.send_data(f"{joint_angles_pickup[1]} {joint_angles_pickup[2]} {joint_angles_pickup[3]} {True}")
 
             print(f"[Master] Awaiting vex brain confirmation message...")
-            response = serial.receive_data(TIMEOUT)
+            response = serial.receive_data(VEX_TIMEOUT)
             if response == "":
                 print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
                 lost_connection = True
@@ -190,7 +192,7 @@ def main():
             serial.send_data(f"{0} {90} {0} {True}")
             
             print(f"[Master] Awaiting vex brain confirmation message...")
-            response = serial.receive_data(TIMEOUT)
+            response = serial.receive_data(VEX_TIMEOUT)
             if response == "":
                 print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
                 lost_connection = True
@@ -199,7 +201,8 @@ def main():
             current_timestamp = datetime.now()
 
             print("[Master] Waiting for object list update after movement...")
-            while True:
+            updated = False
+            for i in range(CAMRULER_TIMEOUT):
                 with objects_lock:
                     updated_objects = objects
 
@@ -207,10 +210,15 @@ def main():
 
                 # Find objects added to object log by camera after movement timestamp
                 if any(o.timestamp > current_timestamp for o in updated_objects):
+                    updated = True
                     break
 
-                time.sleep(0.5)
+                time.sleep(1)
             
+            if updated is False:
+                serial.send_data("Object list never updated")
+                raise TimeoutError("Object list never updated")
+
             # TODO: Loop resend pickup coords if object has not been picked up. May need some retry algo that hones in on the object
             # Create a loop out of this where it retries sending the origin coords (or gets new coords from the found object, the block may have been moved)
             # success = False
@@ -238,7 +246,7 @@ def main():
 
             serial.send_data(f"{joint_angles_dropoff[1]} {joint_angles_dropoff[2]} {joint_angles_dropoff[3]} {False}")
             print(f"[Master] Awaiting vex brain confirmation message...")
-            response = serial.receive_data(TIMEOUT)
+            response = serial.receive_data(VEX_TIMEOUT)
             if response == "":
                 print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
                 lost_connection = True
