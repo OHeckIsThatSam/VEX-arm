@@ -5,7 +5,7 @@ from arm_model import ArmModel
 import serial_communication as serial
 
 
-# Config file name
+# Log of objects seen by vision system
 OBJECT_LOG_PATH = os.path.join(os.getcwd(), "object_log.csv") 
 
 # Filtering rules, these are used to ensure that objects detected at least match the expected size, values in CM
@@ -70,16 +70,6 @@ def read_objects():
 
     return local_objects
 
-def object_updater_thread():
-    global objects
-    print("[Object Updater Thread] Started...")
-    while True:
-        updated = read_objects()
-        with objects_lock:
-            objects = updated
-        time.sleep(0.5)
-
-
 def decide_target_objects_order(objects):
     if not objects:
         return []
@@ -100,7 +90,6 @@ def decide_target_objects_order(objects):
 
 def decide_target_objects_destination(objects):
     global MIN_DIST, FORBIDDEN_Y_RANGE, GRID_STEP, GRID_LIMIT
-    destinations = []
     assigned_targets = []
 
     def is_valid_target(tx, ty, obj):
@@ -138,16 +127,11 @@ def decide_target_objects_destination(objects):
     return assigned_targets
 
 def main():
-    #global objects
     print("[Master] Starting task...")
 
     print("[Master] Initialising VEX arm model...")
     arm = ArmModel(config.X_LIMIT, config.Y_LIMIT, config.Z_LIMIT)
-   
-    print("[Master] Starting object_updater_thread...")
-    #thread = threading.Thread(target=object_updater_thread, daemon=True)
-    #thread.start()
-    
+     
     lost_connection = False
     while lost_connection is False:       
         objects = read_objects()
@@ -155,7 +139,6 @@ def main():
         target_objects = decide_target_objects_order(objects)
         if not target_objects:
             print("[Master] No valid targets found.")
-            # Optional: send alarm to VEX brain here
             time.sleep(2)
             continue  # Retry after delay
 
@@ -209,8 +192,6 @@ def main():
                 for i in range(CAMRULER_TIMEOUT):
                     updated_objects = read_objects()
 
-                    #print(updated_objects)
-
                     # Find objects added to object log by camera after movement timestamp
                     if any(o.timestamp > current_timestamp for o in updated_objects) or len(updated_objects) == 0:
                         updated = True
@@ -257,14 +238,10 @@ def main():
                 lost_connection = True
                 break
 
-            # Short cool down between actions, testing to confirm whether this is needed or not
+            # Short cool down between actions
             time.sleep(1)
         
-        # Slight break between iterations
         time.sleep(1)
-        # If we add more after this, uncomment the following line so that we break out of the loop when the connection to the vex brain has been determined as lost
-        # if lost_connection:
-        #   continue
 
 if __name__ == "__main__":
     main()
