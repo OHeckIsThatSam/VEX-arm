@@ -9,9 +9,9 @@ import serial_communication as serial
 OBJECT_LOG_PATH = os.path.join(os.getcwd(), "object_log.csv") 
 
 # Filtering rules, these are used to ensure that objects detected at least match the expected size, values in CM
-MIN_WIDTH = 7.0
+MIN_WIDTH = 6.0
 MAX_WIDTH = 9.0
-MIN_HEIGHT = 7.0
+MIN_HEIGHT = 6.0
 MAX_HEIGHT = 9.0
 MIN_AREA = MIN_WIDTH * MIN_HEIGHT
 MAX_AREA = MAX_WIDTH * MAX_HEIGHT
@@ -179,10 +179,11 @@ def main():
                     break
 
                 print("[Master] Sending command to VEX...")
+                print(f"[Master] Command {joint_angles_pickup[1]} {joint_angles_pickup[2]} {joint_angles_pickup[3]} {True}")
                 # Send command from joint angles and set pickup to be true
                 serial.send_data(f"{joint_angles_pickup[1]} {joint_angles_pickup[2]} {joint_angles_pickup[3]} {True}")
 
-                print(f"[Master] Awaiting vex brain confirmation message...")
+                print(f"[Master] Awaiting vex brain confirmation message for origin...")
                 response = serial.receive_data(VEX_TIMEOUT)
                 if response == "":
                     print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
@@ -191,11 +192,13 @@ def main():
 
                 # Send command to Move arm to deadzone to unblock view for camera go to closest facing direction on the x axis
                 if abs(joint_angles_pickup[1]) >= 270 or abs(joint_angles_pickup[1]) <= 90:
+                    print(f"[Master] Moving to deadzone: RIGHT")
                     serial.send_data(f"{0} {90} {0} {True}")
                 else:
+                    print(f"[Master] Moving to deadzone: LEFT")
                     serial.send_data(f"{180} {90} {0} {True}")
 
-                print(f"[Master] Awaiting vex brain confirmation message...")
+                print(f"[Master] Awaiting vex brain confirmation message for deadzone...")
                 response = serial.receive_data(VEX_TIMEOUT)
                 if response == "":
                     print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")
@@ -213,6 +216,7 @@ def main():
 
                     # Find objects added to object log by camera after movement timestamp
                     if any(o.timestamp > current_timestamp for o in updated_objects) or len(updated_objects) == 0:
+                        print(f"[Master] No objects detected near origin")
                         updated = True
                         break
 
@@ -222,7 +226,11 @@ def main():
                 if updated is False:
                     #serial.send_data("Object list never updated")
                     raise TimeoutError("Object list never updated")    
-            
+
+                print(f"[Master] length of updated objects: {len(updated_objects)}")
+                if len(updated_objects) == 0:
+                    is_picked_up = True
+
                 # Check for any object near target origin — assume pickup succeeded if none are near
                 for obj in updated_objects:
                     dist = ((obj.mid_x - object_x) ** 2 + (obj.mid_y - object_y) ** 2) ** 0.5
@@ -250,7 +258,7 @@ def main():
                 continue
 
             serial.send_data(f"{joint_angles_dropoff[1]} {joint_angles_dropoff[2]} {joint_angles_dropoff[3]} {False}")
-            print(f"[Master] Awaiting vex brain confirmation message...")
+            print(f"[Master] Awaiting vex brain confirmation message for target...")
             response = serial.receive_data(VEX_TIMEOUT)
             if response == "":
                 print(f"[Master] Timed out while waiting for vex brain to respond, please check that the vex brain is operating correctly")

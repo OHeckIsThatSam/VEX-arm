@@ -27,7 +27,7 @@ if os.path.exists(log_file):
     open(log_file, 'w').close()
 
 # Config fallbacks
-camera_id = 1
+camera_id = 2
 camera_width = 1920
 camera_height = 1080
 camera_frame_rate = 30

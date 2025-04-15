@@ -21,7 +21,10 @@ def receive_data(timeout=20) -> str:
         size = ser.inWaiting()
         if size != 0:
             data = ser.read(size)
-            return data.decode()
+            message = data.decode()
+            print(f"[Serial Communication] Message received from VEX")
+            print(f"[Serial Communication] Message: {message}")
+            return message
         else:
             time.sleep(1)
     return ""
