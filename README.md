@@ -48,7 +48,7 @@ Run the controller/master.py file to start picking up and dropping off objects.
 
 A video demonstrating the capabilities of the system, covering the constraints of the design and the subsequent error cases and recovery.
 
-[Video]()
+[Video](https://youtu.be/OErSkC1RVZI)
 
 ## Future Work
 
