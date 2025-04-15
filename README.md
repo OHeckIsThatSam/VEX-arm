@@ -61,7 +61,7 @@ A video demonstrating the capabilities of the system, covering the constraints o
 
 ### Kinematics
 
-[Visual Kinematics package](https://github.com/dbddqy/visual_kinematics/tree/master)
+- [Visual Kinematics package](https://github.com/dbddqy/visual_kinematics/tree/master)
 
 Other investigated kinematic package options:
 
@@ -82,18 +82,18 @@ Kinematics (background reading):
 
 ### Vision
 
-[Clayton Darwin's CamRuler](https://gitlab.com/duder1966/youtube-projects/-/tree/master/OpenCV/camruler?ref_type=heads)
-[OpenCV package](https://opencv.org/)
+- [Clayton Darwin's CamRuler](https://gitlab.com/duder1966/youtube-projects/-/tree/master/OpenCV/camruler?ref_type=heads)
+- [OpenCV package](https://opencv.org/)
 
 ### Vex
 
-[VEX EXP API](https://api.vex.com/exp/home/)
-[VEX Serial](https://www.vexforum.com/t/how-can-i-read-the-serial-port-of-my-vex-exp-using-a-usb-cable/122553/3)
-[VEX import modules](https://www.vexforum.com/t/how-do-i-download-modules-to-the-brain/123402)
+- [VEX EXP API](https://api.vex.com/exp/home/)
+- [VEX Serial](https://www.vexforum.com/t/how-can-i-read-the-serial-port-of-my-vex-exp-using-a-usb-cable/122553/3)
+- [VEX import modules](https://www.vexforum.com/t/how-do-i-download-modules-to-the-brain/123402)
 
 ### Other
 
-[pySerial](https://pythonhosted.org/pyserial/shortintro.html)
-[DroidCam](https://droidcam.app/)
-[Stack overflow](https://stackoverflow.com/questions/25187488/python-strftime-utc-offset-not-working-as-expected-in-windows)
-[Python docs](https://docs.python.org/3/c-api/buffer.html)
+- [pySerial](https://pythonhosted.org/pyserial/shortintro.html)
+- [DroidCam](https://droidcam.app/)
+- [Stack overflow](https://stackoverflow.com/questions/25187488/python-strftime-utc-offset-not-working-as-expected-in-windows)
+- [Python docs](https://docs.python.org/3/c-api/buffer.html)
