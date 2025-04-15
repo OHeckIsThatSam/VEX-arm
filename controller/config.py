@@ -1,6 +1,6 @@
 # Set distances defined by camera config
-X_LIMIT = [-47, 47] # 51cm max
-Y_LIMIT = [-27, 27] # 26cm max
+X_LIMIT = [-47, 47]
+Y_LIMIT = [-27, 27]
 Z_LIMIT = [0, 69]
 
 # Set calculations config
