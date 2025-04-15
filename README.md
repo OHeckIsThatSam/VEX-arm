@@ -52,8 +52,10 @@ A video demonstrating the capabilities of the system, covering the constraints o
 
 ## Future Work
 
-The hardware of the arm was a heavy limitation in the accuracy of the robot. Within the given use case this was acceptable however improving the motors, axles and bearings would drastically make the arm more versatile.
-The "Vex Brian" has little to no support for large external packages and strict resource limitations so most heavy processing must be done on a separate device. An embedded device with more resources would allow the consolidation of modules into a single device heavily reducing the complexity of setup and operation.
+- The hardware of the arm was a heavy limitation in the accuracy of the robot. Within the given use case this was acceptable however improving the motors, axles and bearings would drastically make the arm more versatile.
+- The "Vex Brian" has little to no support for large external packages and strict resource limitations so most heavy processing must be done on a separate device. An embedded device with more resources would allow the consolidation of modules into a single device heavily reducing the complexity of setup and operation.
+- The object detection could be refactored to store configuration data. This would allow for two things, one would be allowing for the camruler process to be opened only when needed without losing the calibration, this would reduce resource usage. The second would be eliminating having the calibrate for the same set up after rebooting, and calibration would only occur when it is needed.
+- The camera system could be extended. There is a significant weakness in the system which is caused by the single camera setup. As demonstrated in the video, if the robot is close to, or covering, an object, the object is not detected at all, or is merged with the robot into one object. Both cases result in the object not being detected. This breaks detecting the object to pick it up, whether at the start of the process or as part of retrying to pick up the object when it wasn't picked up correctly after the initial attempt. A solution to this would be to add more cameras or other appropriate sensors, such as a LiDAR to ensure that there are no blindspots. 
 
 ## Resources
 
@@ -80,6 +82,7 @@ Kinematics (background reading):
 
 ### Vision
 
+[Clayton Darwin's CamRuler](https://gitlab.com/duder1966/youtube-projects/-/tree/master/OpenCV/camruler?ref_type=heads)
 [OpenCV package](https://opencv.org/)
 
 ### Vex
